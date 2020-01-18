@@ -65,28 +65,24 @@
 	(=    ,=)
 	(!=   ,(lambda (a1 a2) (not (= a1 a2))))
 	(<    ,<)
-        (>    ,>)
-        (<=   ,<=)
-        (>=   ,>=)
-        (atan ,atan)
-        (exp  ,exp)
-        (log  ,log)
-        ))
-;(raise (hash-ref *function-table* '+))
+	(>    ,>)
+	(<=   ,<=)
+	(>=   ,>=)
+    ))
 
 (define *variable-table* (make-hash))
 (for-each
- (lambda (varval)
-   (hash-set! *variable-table* (car varval) (cadr varval)))
- `(
-   (pi    ,(acos -1))
-   (e     ,(exp 1))
-   (i     ,(sqrt -1))
-   (one   1)
-   (zero  0)
-   (eof   0.0)
-   (nan   ,(/ 0.0 0.0))
-   ))
+    (lambda (varval)
+        (hash-set! *variable-table* (car varval) (cadr varval)))
+    `(
+        (pi    ,(acos -1))
+        (e     ,(exp 1))
+        (i     ,(sqrt -1))
+        (one   1)
+        (zero  0)
+	(eof   0.0)
+	(nan   ,(/ 0.0 0.0))
+    ))
 
 (define *array-table* (make-hash))
 (define *label-table* (make-hash))
@@ -95,7 +91,7 @@
   (printf "*function-table*:\n")
   (hash-for-each
    *function-table*
-   (lambda (key value) (printf "~v: ~v\n" key value) #t))
+   (lambda (key value) (printf "~s: ~s\n" key value) #t))
   (printf "*variable-table*:\n")
   (hash-for-each
    *variable-table*
@@ -123,16 +119,12 @@
 	((string? expr) expr)
 	((symbol? expr) (hash-ref *variable-table* expr))
 	((pair? expr)
-	 (cond ((eqv? (car expr) 'asub)
-		(let ((aray (hash-ref *array-table* (cadr expr))))
-		  (vector-ref aray (inexact->exact (interpret-expression (caddr expr))))))
-	       (else
-		(let ((operator (hash-ref *function-table* (car expr)))
-		      (operands (map interpret-expression (cdr expr))))
-		  (if (null? operator)
-		      NAN
-		      (apply operator operands))))))
-	(else (raise (format "~a is not a valid expr" expr)))))
+	 (let ((operator (hash-ref *function-table* (car expr)))
+	       (operands (map interpret-expression (cdr expr))))
+	   (if (null? operator)
+	       NAN
+	       (apply operator operands))))
+	(else NAN)))
 
 (define (print-exprs exprs)
   (if (empty? exprs)
@@ -141,54 +133,17 @@
 	(printf "~a" (car exprs))
 	(print-exprs (cdr exprs)))))
 
-(define (update-variable var val)
-  (cond ((symbol? var) (hash-set! *variable-table* var val))
-        ((pair? var) 
-	 (if (eqv? (car var) 'asub)
-	     (let ((aray (hash-ref *array-table* (cadr var)))
-		   (indx (interpret-expression (caddr var))))
-	       (vector-set! aray (inexact->exact indx) val))
-	     (raise (format "does not know what is ~v" (car var)))))
-	(else (raise (format "~v is not valid memory ref" var)))
-	))
-
-(define (make-new-array mem-ref)
-  (let ((name (cadr mem-ref))
-	(indx (interpret-expression (caddr mem-ref))))
-    (begin
-      (printf "name: ~v, exact indx: ~v\n" name (inexact->exact indx))
-      (let ((aray (make-vector (inexact->exact indx) 0.0)))
-	(hash-set! *array-table* name aray)))))
-	
-;	(for-each (lambda (i) (vector-set! aray i 0.0)) aray)))))
-
 (define (interpret-statement stmt)
   (cond ((null? stmt) '())
 	(else
 	 (let ((header (car stmt)))
 	  (cond ((eqv? header 'goto) (cdr stmt))
-		((eqv? header 'print)
-		 (begin (print-exprs (map interpret-expression (cdr stmt)))
-			'()))
-		((eqv? header 'let)
-		 (begin
-		   (printf "let ~s = ~s\n" (cadr stmt) (caddr stmt)) 
-		   (let ((var-bind (cadr stmt))
-			 (var-val (interpret-expression (caddr stmt))))
-		     (begin
-		       (printf "let ~s = ~s\n" var-bind var-val)
-		       (update-variable var-bind var-val)
-					;  (hash-set! *variable-table* var-bind var-val)
-		       '()))))
-		((eqv? header 'dim)
-		 (begin
-		   (make-new-array (cadr stmt))
-		   '()))
+		((eqv? header 'print) (print-exprs (map interpret-expression (cdr stmt))))
 		(else (raise  header)))
-	  ))))
+	))))
 
 (define (interpret-program program)
- ; (printf "interpret-program at ~a...\n" program)
+;  (printf "interpret-program at ~a...\n" (car program))
   (if (empty? program)
       (void)	; (dump-tables)
       (let ((stmt (car program)) 
@@ -197,15 +152,10 @@
 	  ;(if (is-label-stmt stmt)
 	  ;    (put-label stmt)
 	  ;    (empty-statement))
-	  (let ((label-opt (interpret-statement stmt)))
-	    (begin
-;	      (printf "label-opt returned ~a\n" label-opt)
-	      (if (null? label-opt)
-		  (interpret-program cont)
-		  (let ((program-counter (hash-ref *label-table* (car label-opt) NAN)))
-		    (begin
-		      (printf "label-opt is not empty: ~s\n" label-opt)
-		      (interpret-program program-counter))))))))))
+	  (interpret-statement stmt)
+	;  (printf "interpret a statement success\n")
+	  (interpret-program cont)))))
+
 
 ;; interp end here
 
@@ -217,9 +167,8 @@
     (for-each (lambda (line) (printf "~a~n" line)) program)
 ;    (interpret-program (remove-lino program))
     (printf ")~n")
-    ; (dump-tables)
     (let ((program-nolino (remove-lino program)))
-      (for-each (lambda (line) (printf "~v~n" line)) program-nolino)
+      (for-each (lambda (line) (printf "~a~n" line)) program-nolino)
       (interpret-program program-nolino))
     )
 
@@ -233,4 +182,3 @@
 (if (terminal-port? *stdin*)
     (main *arg-list*)
     (printf "sbi.scm: interactive mode~n"))
-
