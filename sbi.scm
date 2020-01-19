@@ -68,9 +68,18 @@
         (>    ,>)
         (<=   ,<=)
         (>=   ,>=)
+	(sin  ,sin)
+	(cos  ,cos)
+	(tan  ,tan)
+	(acos ,acos)
+	(asin ,asin)
         (atan ,atan)
         (exp  ,exp)
         (log  ,log)
+	(abs  ,abs)
+	(ceiling ,ceiling)
+	(floor ,floor)
+	(round ,round)
         ))
 ;(raise (hash-ref *function-table* '+))
 
@@ -112,9 +121,14 @@
 
 (define (remove-lino program)	
   (map (lambda (line)
-	 (if (empty? (cdr line))
-	     (cdr line)
-	     (cadr line)))
+;	 (cdr line))
+	 (cond ((empty? (cdr line)) (cdr line))
+	       ((empty? (cddr line))
+		(if (symbol? (cadr line))  ; goto without folloing statement in that line
+		    `(,(cadr line) ())
+		    (cadr line)))
+	       (else `(,(cadr line) ,(caddr line)))))
+;	     (cadr line)))
        program))
 
 (define (interpret-expression expr)
@@ -156,11 +170,21 @@
   (let ((name (cadr mem-ref))
 	(indx (interpret-expression (caddr mem-ref))))
     (begin
-      (printf "name: ~v, exact indx: ~v\n" name (inexact->exact indx))
+;      (printf "name: ~v, exact indx: ~v\n" name (inexact->exact indx))
       (let ((aray (make-vector (inexact->exact indx) 0.0)))
 	(hash-set! *array-table* name aray)))))
-	
-;	(for-each (lambda (i) (vector-set! aray i 0.0)) aray)))))
+
+(define (read-vars vars)
+  (cond ((empty? vars) (void))
+	(else
+	 (let ((head (car vars))
+	       (tail (cdr vars)))
+	   (begin
+	     (let ((val (+ (read) 0.0)))
+	       (hash-set! *variable-table* head val)
+	       (printf "adding ~v:~v to variable-table\n" head val))
+	     (read-vars tail))))))
+	       
 
 (define (interpret-statement stmt)
   (cond ((null? stmt) '())
@@ -172,11 +196,11 @@
 			'()))
 		((eqv? header 'let)
 		 (begin
-		   (printf "let ~s = ~s\n" (cadr stmt) (caddr stmt)) 
+;		   (printf "let ~s = ~s\n" (cadr stmt) (caddr stmt)) 
 		   (let ((var-bind (cadr stmt))
 			 (var-val (interpret-expression (caddr stmt))))
 		     (begin
-		       (printf "let ~s = ~s\n" var-bind var-val)
+;		       (printf "let ~s = ~s\n" var-bind var-val)
 		       (update-variable var-bind var-val)
 					;  (hash-set! *variable-table* var-bind var-val)
 		       '()))))
@@ -184,11 +208,22 @@
 		 (begin
 		   (make-new-array (cadr stmt))
 		   '()))
-		(else (raise  header)))
+		((eqv? header 'if)
+		 (let ((condition (interpret-expression (cadr stmt)))
+		       (label (cddr stmt)))
+		   (begin
+		     (if condition label '()))))
+		((eqv? header 'input)
+		 (begin
+		   (read-vars (cdr stmt))
+		   '()))
+		((symbol? header)
+		 (interpret-statement (cadr stmt)))
+		(else (raise (format "unkown statement ~v" stmt))))
 	  ))))
 
 (define (interpret-program program)
- ; (printf "interpret-program at ~a...\n" program)
+;  (printf "interpret-program at ~a...\n" program)
   (if (empty? program)
       (void)	; (dump-tables)
       (let ((stmt (car program)) 
@@ -204,23 +239,49 @@
 		  (interpret-program cont)
 		  (let ((program-counter (hash-ref *label-table* (car label-opt) NAN)))
 		    (begin
-		      (printf "label-opt is not empty: ~s\n" label-opt)
+;		      (printf "label-opt is not empty: ~s\n" label-opt)
 		      (interpret-program program-counter))))))))))
 
+(define (update-label-table program)
+;  (printf "update-label-table: ~v\n" program)
+  (cond ((empty? program) (void))
+	(else
+	 (let ((header (car program))
+	       (tail (cdr program)))
+	   (begin
+	     (cond ((or
+		     (empty? header)
+		     (eqv? (car header) 'print)
+		     (eqv? (car header) 'let)
+		     (eqv? (car header) 'goto)
+		     (eqv? (car header) 'asub)
+		     (eqv? (car header) 'if)
+		     (eqv? (car header) 'input)
+		     (eqv? (car header) 'dim)) (void))
+		   (else
+		    (let ((label (car header))
+			  (stmt (if (empty? header) '() (cadr header))))
+		      (begin
+;			(printf "adding label: ~v; stmt: ~v; tail: ~v to label-table\n" label stmt tail)
+			(hash-set! *label-table* label (cons stmt tail))))))
+	     (update-label-table tail))))))
+ 
 ;; interp end here
 
 (define (write-program-by-line filename program)
     (printf "==================================================~n")
     (printf "~a: ~a~n" *run-file* filename)
     (printf "==================================================~n")
-    (printf "(~n")
-    (for-each (lambda (line) (printf "~a~n" line)) program)
+;    (printf "(~n")
+;    (for-each (lambda (line) (printf "~a~n" line)) program)
 ;    (interpret-program (remove-lino program))
-    (printf ")~n")
+;   (printf ")~n")
     ; (dump-tables)
     (let ((program-nolino (remove-lino program)))
-      (for-each (lambda (line) (printf "~v~n" line)) program-nolino)
-      (interpret-program program-nolino))
+;      (for-each (lambda (line) (printf "~v~n" line)) program-nolino)
+      (begin
+	(update-label-table program-nolino)
+	(interpret-program program-nolino)))
     )
 
 (define (main arglist)
