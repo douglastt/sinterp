@@ -1,4 +1,4 @@
-#!racket
+;#!racket
 ;; $Id: sbi.scm,v 1.19 2020-01-14 16:58:47-08 - - $
 ;;
 ;; NAME
@@ -81,7 +81,6 @@
 	(floor ,floor)
 	(round ,round)
         ))
-;(raise (hash-ref *function-table* '+))
 
 (define *variable-table* (make-hash))
 (for-each
@@ -121,14 +120,12 @@
 
 (define (remove-lino program)	
   (map (lambda (line)
-;	 (cdr line))
 	 (cond ((empty? (cdr line)) (cdr line))
 	       ((empty? (cddr line))
 		(if (symbol? (cadr line))  ; goto without folloing statement in that line
 		    `(,(cadr line) ())
 		    (cadr line)))
 	       (else `(,(cadr line) ,(caddr line)))))
-;	     (cadr line)))
        program))
 
 (define (interpret-expression expr)
@@ -170,7 +167,6 @@
   (let ((name (cadr mem-ref))
 	(indx (interpret-expression (caddr mem-ref))))
     (begin
-;      (printf "name: ~v, exact indx: ~v\n" name (inexact->exact indx))
       (let ((aray (make-vector (inexact->exact indx) 0.0)))
 	(hash-set! *array-table* name aray)))))
 
@@ -181,11 +177,10 @@
 	       (tail (cdr vars)))
 	   (begin
 	     (let ((val (+ (read) 0.0)))
-	       (hash-set! *variable-table* head val)
-	       (printf "adding ~v:~v to variable-table\n" head val))
+	       (hash-set! *variable-table* head val))
+					;     (printf "adding ~v:~v to variable-table\n" head val))
 	     (read-vars tail))))))
 	       
-
 (define (interpret-statement stmt)
   (cond ((null? stmt) '())
 	(else
@@ -196,13 +191,10 @@
 			'()))
 		((eqv? header 'let)
 		 (begin
-;		   (printf "let ~s = ~s\n" (cadr stmt) (caddr stmt)) 
 		   (let ((var-bind (cadr stmt))
 			 (var-val (interpret-expression (caddr stmt))))
 		     (begin
-;		       (printf "let ~s = ~s\n" var-bind var-val)
 		       (update-variable var-bind var-val)
-					;  (hash-set! *variable-table* var-bind var-val)
 		       '()))))
 		((eqv? header 'dim)
 		 (begin
@@ -229,21 +221,15 @@
       (let ((stmt (car program)) 
 	     (cont (cdr program)))
 	(begin
-	  ;(if (is-label-stmt stmt)
-	  ;    (put-label stmt)
-	  ;    (empty-statement))
 	  (let ((label-opt (interpret-statement stmt)))
 	    (begin
-;	      (printf "label-opt returned ~a\n" label-opt)
 	      (if (null? label-opt)
 		  (interpret-program cont)
 		  (let ((program-counter (hash-ref *label-table* (car label-opt) NAN)))
 		    (begin
-;		      (printf "label-opt is not empty: ~s\n" label-opt)
 		      (interpret-program program-counter))))))))))
 
 (define (update-label-table program)
-;  (printf "update-label-table: ~v\n" program)
   (cond ((empty? program) (void))
 	(else
 	 (let ((header (car program))
@@ -262,16 +248,15 @@
 		    (let ((label (car header))
 			  (stmt (if (empty? header) '() (cadr header))))
 		      (begin
-;			(printf "adding label: ~v; stmt: ~v; tail: ~v to label-table\n" label stmt tail)
 			(hash-set! *label-table* label (cons stmt tail))))))
 	     (update-label-table tail))))))
  
 ;; interp end here
 
 (define (write-program-by-line filename program)
-    (printf "==================================================~n")
-    (printf "~a: ~a~n" *run-file* filename)
-    (printf "==================================================~n")
+;    (printf "==================================================~n")
+;    (printf "~a: ~a~n" *run-file* filename)
+;    (printf "==================================================~n")
 ;    (printf "(~n")
 ;    (for-each (lambda (line) (printf "~a~n" line)) program)
 ;    (interpret-program (remove-lino program))
@@ -281,7 +266,8 @@
 ;      (for-each (lambda (line) (printf "~v~n" line)) program-nolino)
       (begin
 	(update-label-table program-nolino)
-	(interpret-program program-nolino)))
+	(with-handlers ((exn:fail? (lambda (e) (printf "exception occurs: ~s\n" e))))
+		       (interpret-program program-nolino))))
     )
 
 (define (main arglist)
