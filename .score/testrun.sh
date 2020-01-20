@@ -1,7 +1,9 @@
 #!/bin/sh -x
 # $Id: testrun.sh,v 1.4 2019-11-25 16:57:16-08 - - $
 
-export PATH=$PATH:/afs/cats.ucsc.edu/courses/cse112-wm/bin
+export PATH=$PATH:/home/jian/Desktop/sinterp/bin
+
+#/afs/cats.ucsc.edu/courses/cse112-wm/bin
 
 checksource *.scm >check.log
 

@@ -1,5 +1,5 @@
-#!/usr/bin/env mzscheme
-#lang mzscheme
+#!/usr/bin/mzscheme
+#lang racket
 
 (define *stdin* (current-input-port))
 (define *stdout* (current-output-port))
